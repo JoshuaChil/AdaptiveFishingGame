@@ -4,14 +4,21 @@
 const int BUTTON_A = D1;
 const int BUTTON_B = D2;
 const uint8_t receiverMac[] = {0x58, 0x8C, 0x81, 0xA9, 0x4A, 0x9C};
-int state = 0;
+int pivot_state = 0;
+bool reel_down = false;
+int direction = 1;
 
 int lastA = HIGH;
 int lastB = HIGH;
 
 struct PositionCommand {
-  uint8_t magic; // the key check value
+  uint8_t type; // the key check value
   uint8_t position;  // the actual position command
+};
+
+struct ReelCommand {
+  uint8_t type;
+  uint8_t reelState;
 };
 
 void setup() {
@@ -41,12 +48,25 @@ void setup() {
 }
 
 void sendPosition() {
-    PositionCommand cmd = {0xA5, (uint8_t)state};
+    PositionCommand cmd = {1, (uint8_t)pivot_state};
     esp_err_t result = esp_now_send(receiverMac, (uint8_t*)&cmd, sizeof(cmd));
 
     if (result == ESP_OK) {
     Serial.print("Sent position: ");
-    Serial.println(state);
+    Serial.println(pivot_state);
+    }
+    else {
+    Serial.println("Send failed");
+    }
+}
+
+void sendReelState() {
+    ReelCommand cmd = {2, (uint8_t)reel_down};
+    esp_err_t result = esp_now_send(receiverMac, (uint8_t*)&cmd, sizeof(cmd));
+
+    if (result == ESP_OK) {
+    Serial.print("Sent state, reel down is: ");
+    Serial.println(reel_down);
     }
     else {
     Serial.println("Send failed");
@@ -58,14 +78,24 @@ void loop() {
   int b = digitalRead(BUTTON_B);
 
   if (a == LOW && lastA == HIGH) {
-    state = (state + 1) % 5;
-    sendPosition();
+    reel_down = !reel_down;
+    sendReelState();
   }
 
-  if (b == LOW && lastB == HIGH) {
-    state = (state + 4) % 5;
-    sendPosition();
+ if (b == LOW && lastB == HIGH) {
+  pivot_state += direction;
+
+  if (pivot_state >= 4) {
+    pivot_state = 4;
+    direction = -1;
   }
+  else if (pivot_state <= 0) {
+    pivot_state = 0;
+    direction = 1;
+  }
+
+  sendPosition();
+}
 
   lastA = a;
   lastB = b;
