@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProtoPlanner</title>
+  <meta name="description" content="ElectroCookie protoboard layout planner and logic-level circuit simulator">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%231f5f7a%27/%3E%3Ccircle cx=%275%27 cy=%275%27 r=%271.6%27 fill=%27%23d4a834%27/%3E%3Ccircle cx=%2711%27 cy=%275%27 r=%271.6%27 fill=%27%23d4a834%27/%3E%3Ccircle cx=%275%27 cy=%2711%27 r=%271.6%27 fill=%27%23d4a834%27/%3E%3Ccircle cx=%2711%27 cy=%2711%27 r=%271.6%27 fill=%27%23d4a834%27/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-mode="edit">
+
+  <header id="toolbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <h1>ProtoPlanner</h1>
+    </div>
+
+    <div class="group tools" role="toolbar" aria-label="Tools">
+      <button id="tool-select" class="btn tool-btn active" title="Select / move (V)" data-tool="select">
+        <span class="icon" aria-hidden="true">&#x2196;</span><span class="label">Select</span><kbd>V</kbd>
+      </button>
+      <button id="tool-wire" class="btn tool-btn" title="Jumper wire: click start hole, then end hole (W)" data-tool="wire">
+        <span class="icon" aria-hidden="true">&#x2571;</span><span class="label">Wire</span><kbd>W</kbd>
+      </button>
+      <button id="tool-bridge" class="btn tool-btn" title="Solder bridge between adjacent holes (B)" data-tool="bridge">
+        <span class="icon" aria-hidden="true">&#x2550;</span><span class="label">Bridge</span><kbd>B</kbd>
+      </button>
+      <button id="tool-pan" class="btn tool-btn" title="Pan the view (hold Space and drag)" data-tool="pan">
+        <span class="icon" aria-hidden="true">&#x270B;</span><span class="label">Pan</span><kbd>Space</kbd>
+      </button>
+    </div>
+
+    <div class="group edit" role="toolbar" aria-label="Edit">
+      <button id="btn-undo" class="btn" title="Undo (Cmd/Ctrl+Z)"><span class="icon" aria-hidden="true">&#x21B6;</span><span class="label">Undo</span></button>
+      <button id="btn-redo" class="btn" title="Redo (Shift+Cmd/Ctrl+Z)"><span class="icon" aria-hidden="true">&#x21B7;</span><span class="label">Redo</span></button>
+      <button id="btn-rotate" class="btn" title="Rotate selected part (R)"><span class="icon" aria-hidden="true">&#x27F3;</span><span class="label">Rotate</span></button>
+      <button id="btn-delete" class="btn danger-hover" title="Delete selection (Delete / Backspace)"><span class="icon" aria-hidden="true">&#x2715;</span><span class="label">Delete</span></button>
+    </div>
+
+    <div class="group options">
+      <label class="field" title="Color for new jumper wires">
+        <span class="field-label">Wire</span>
+        <select id="sel-wire-color" aria-label="Wire color">
+          <option value="red" selected>red</option>
+          <option value="black">black</option>
+          <option value="blue">blue</option>
+          <option value="green">green</option>
+          <option value="yellow">yellow</option>
+          <option value="orange">orange</option>
+          <option value="white">white</option>
+          <option value="purple">purple</option>
+          <option value="brown">brown</option>
+          <option value="grey">grey</option>
+        </select>
+      </label>
+      <label class="field" title="Protoboard size">
+        <span class="field-label">Board</span>
+        <select id="sel-board" aria-label="Board kind">
+          <option value="mini">Mini (17 cols, no rails)</option>
+          <option value="half" selected>Half (30 cols + 4 rails)</option>
+          <option value="dual">Dual half (2 blocks)</option>
+          <option value="full">Full (63 cols)</option>
+        </select>
+      </label>
+      <label class="field" title="Load a preset project (replaces the current one)">
+        <span class="field-label">Preset</span>
+        <select id="sel-preset" aria-label="Preset">
+          <option value="" selected>Load preset&hellip;</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group run">
+      <button id="btn-run" class="btn primary" title="Toggle Run mode: drive GPIO pins and watch the circuit respond">
+        <span class="icon" aria-hidden="true">&#x25B6;</span><span class="label">Run</span>
+      </button>
+    </div>
+
+    <div class="group io" role="toolbar" aria-label="Export and import">
+      <span class="field-label">Export</span>
+      <button id="btn-export-json" class="btn" title="Download project as JSON">JSON</button>
+      <button id="btn-export-svg" class="btn" title="Download the board drawing as SVG">SVG</button>
+      <button id="btn-export-png" class="btn" title="Download the board drawing as PNG">PNG</button>
+      <button id="btn-export-md" class="btn" title="Download wiring list and BOM as Markdown">MD</button>
+      <button id="btn-import" class="btn" title="Import a ProtoPlanner JSON file">Import&hellip;</button>
+      <input type="file" id="file-import" accept="application/json,.json" hidden>
+    </div>
+
+    <div class="group help">
+      <button id="btn-help" class="btn round" title="Controls and keyboard shortcuts" aria-haspopup="dialog" aria-controls="help">?</button>
+    </div>
+  </header>
+
+  <aside id="palette" aria-label="Parts palette">
+    <div class="section-title">Parts</div>
+    <p class="muted palette-hint">Click a part to place it, or drag it onto the board.</p>
+  </aside>
+
+  <main id="workspace">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+      <style id="svg-style"></style>
+      <g id="viewport">
+        <g id="layer-bench"></g><g id="layer-board"></g><g id="layer-bridges"></g><g id="layer-parts"></g>
+        <g id="layer-modules"></g><g id="layer-wires"></g><g id="layer-highlight"></g><g id="layer-overlay"></g>
+      </g>
+    </svg>
+  </main>
+
+  <aside id="sidepanel" aria-label="Side panel">
+    <div class="tabs" role="tablist">
+      <button id="tab-props" class="tab active" role="tab" aria-selected="true" aria-controls="panel-props">Properties</button>
+      <button id="tab-checks" class="tab" role="tab" aria-selected="false" aria-controls="panel-checks">Checks</button>
+      <button id="tab-run" class="tab" role="tab" aria-selected="false" aria-controls="panel-run">Run</button>
+    </div>
+    <div class="panes">
+      <section id="panel-props" class="panel active" role="tabpanel" aria-labelledby="tab-props"></section>
+      <section id="panel-checks" class="panel" role="tabpanel" aria-labelledby="tab-checks"></section>
+      <section id="panel-run" class="panel" role="tabpanel" aria-labelledby="tab-run"></section>
+    </div>
+  </aside>
+
+  <footer id="status" role="status" aria-live="polite">Loading&hellip;</footer>
+
+  <dialog id="help" aria-labelledby="help-title">
+    <div class="help-head">
+      <h2 id="help-title">Controls</h2>
+      <button class="btn round" data-close-help title="Close">&#x2715;</button>
+    </div>
+    <dl class="help-list">
+      <dt>Place a part</dt><dd>Click a palette card, then click on the board, or drag the card onto the board. Green ghost = valid, red = invalid.</dd>
+      <dt>Move a part</dt><dd>Drag it with the Select tool. Through-hole parts snap to holes; the XIAO straddles the channel.</dd>
+      <dt>Wire</dt><dd>Press <kbd>W</kbd> (or the Wire tool), click the first hole or terminal, then click the second. <kbd>Esc</kbd> cancels. Drag a wire's middle to bend it.</dd>
+      <dt>Bridge</dt><dd>Press <kbd>B</kbd>, then click two adjacent holes to solder-bridge them.</dd>
+      <dt>Nets</dt><dd>Hover any hole, pin or terminal to highlight everything connected to it; the status bar shows the net name.</dd>
+      <dt>Rotate</dt><dd><kbd>R</kbd> rotates the selected part 90&deg; around its anchor pin.</dd>
+      <dt>Delete</dt><dd><kbd>Delete</kbd> or <kbd>Backspace</kbd> removes the selection (a part's wires go with it).</dd>
+      <dt>Undo / Redo</dt><dd><kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Shift</kbd>+<kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd>.</dd>
+      <dt>Pan</dt><dd>Hold <kbd>Space</kbd> and drag, or use the Pan tool.</dd>
+      <dt>Zoom</dt><dd>Mouse wheel / trackpad scroll over the canvas.</dd>
+      <dt>Tools</dt><dd><kbd>V</kbd> Select, <kbd>W</kbd> Wire, <kbd>B</kbd> Bridge, <kbd>Esc</kbd> back to Select.</dd>
+      <dt>Run mode</dt><dd>Press Run, then toggle GPIO pins or start a script in the Run tab. Blue = GND, red = VCC, orange = HIGH.</dd>
+    </dl>
+    <p class="muted">Your project autosaves to this browser. Use Export JSON to keep a copy.</p>
+  </dialog>
+
+  <noscript>ProtoPlanner needs JavaScript (ES modules) enabled.</noscript>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

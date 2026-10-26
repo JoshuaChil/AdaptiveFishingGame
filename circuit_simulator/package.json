@@ -1,0 +1,11 @@
+{
+  "name": "protoplanner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ElectroCookie protoboard layout planner + logic-level circuit simulator for the fishing game receiver",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8080"
+  }
+}
